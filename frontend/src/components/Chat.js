@@ -3,15 +3,15 @@ import React, { useState, useEffect } from 'react'
 import UserBox from './UserBox';
 import axios from 'axios';
 import { usePubNub } from 'pubnub-react';
-import data from '../data/users/users.json'
 const Chat = () => {
   const pubnub = usePubNub();
-  const [channels,setChannels] = useState();
-  const [messages, addMessage] = useState([]);
+  const [channels,setChannels] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
-  const [userId, setUserID] = useState();  
+  const [userId, setUserID] = useState('default');  
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [userList, setUserList] = useState([]);
+
   
   useEffect(()=>{
     setUserID(pubnub.getUserId());
@@ -19,6 +19,7 @@ const Chat = () => {
       const newChannel = [userId, selectedUserId].sort().join('_');
       setChannels(newChannel);
       pubnub.subscribe({ channels: [newChannel] });
+      fetchMessages(newChannel);
       return () => {
         if (channels) {
           pubnub.unsubscribe({ channels: [channels] });
@@ -48,12 +49,17 @@ const Chat = () => {
     const message = event.message;
     if (typeof message === 'string' || message.hasOwnProperty('text')) {
       const text = message.text || message;
-      addMessage(messages => [...messages, text]);
+      setMessages(messages => [...messages, text]);
     }
   };
 
   const sendMessage = message => {
-    if (message) {
+    if (userId === "default") {
+      console.log("Please log in to send a message.");
+      alert("Please log in to send a message.");
+      return;
+    }
+    if (message && channels) {
       pubnub
         .publish({ channel: channels, message })
         .then(() => setMessage(''));
@@ -63,7 +69,19 @@ const Chat = () => {
     setSelectedUserId(clickedUserId);
   }
 
-
+  const fetchMessages = async () => {
+    try {
+      const history = await pubnub.history({
+        channel: channels,
+        count: 100,
+      });
+      const messagesFromHistory = history?.messages?.map((message) => message.entry);
+      setMessages(messagesFromHistory || []);
+      console.log("history", history.messages);
+    } catch (error) {
+      console.error("Error fetching messages", error);
+    }
+  };
  
   return (
     <div className='conatiner'>

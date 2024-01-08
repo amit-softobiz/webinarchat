@@ -57,3 +57,7 @@ body {
     margin: 5px;
     padding: 8px 15px;
   };
+  .senderMessage {
+    background-color: #cce5ff; /* Light blue, change as needed */
+    /* Additional styles for sender's messages */
+  }
