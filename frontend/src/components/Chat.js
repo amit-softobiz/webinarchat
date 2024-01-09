@@ -47,10 +47,16 @@ const Chat = () => {
 
   const handleMessage = event => {
     const message = event.message;
-    // console.log("event", event.message);
     if (typeof message === 'string' || message.hasOwnProperty('text')) {
-      const text = message.text || message;
-      setMessages(messages => [...messages, text]);
+      const timetoken = event.timetoken;
+      const milliseconds = timetoken / 10000;
+      const data = new Date(milliseconds);
+      const date = data.toLocaleString();
+      const messagedata = {
+        message: message,
+        date: date,
+      }
+      setMessages((prevMessages) => [...prevMessages, messagedata])
     }
   };
 
@@ -85,25 +91,25 @@ const Chat = () => {
           date: date.toLocaleString(),
         };
       });
-      // console.log("messagesFromHistory", messagesFromHistory);
       setMessages(messagesFromHistory || []);
     } catch (error) {
       console.error("Error fetching messages", error);
     }
   };
-  const deleteMessage = async () => {
+
+  const deleteMessage = async (timetoken) => {
     try {
       const result = await pubnub.deleteMessages({
         channel: channels,
-        start: "17047014092829076",
-        end: "17047246129351932",
+        // start: timetoken,
+        end: timetoken,
       });
-      console.log("deleted function succesfully hit");
+      console.log("Deleted message successfully", result);
+      setMessages(prevMessages => prevMessages.filter(message => message.timetoken !== timetoken));
     } catch (status) {
-      console.log(status);
+      console.log("Error deleting message", status);
     }
   }
-
   return (
     <div className='conatiner'>
       <div className='userlist'>
@@ -123,7 +129,8 @@ const Chat = () => {
               return (
                 <div key={`message-${index}`} className='messageStyles'>
                   {message.date && <>{message.date}<br /><br /></>}
-                  {message.text || message.entry}
+                  {message.message || message.entry}
+                  <button onClick={() => deleteMessage(message.timetoken)}>Delete</button>
                 </div>
               );
             })}
@@ -149,7 +156,6 @@ const Chat = () => {
             >
               Send Message
             </button>
-            <button onClick={deleteMessage}>deleteMessage</button>
           </div>
         </div>
       </div>
