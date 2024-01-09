@@ -5,29 +5,30 @@ import axios from 'axios';
 import { usePubNub } from 'pubnub-react';
 const Chat = () => {
   const pubnub = usePubNub();
-  const [channels,setChannels] = useState(null);
+  const [channels, setChannels] = useState(null);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
-  const [userId, setUserID] = useState('default');  
+  const [userId, setUserID] = useState('default');
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [userList, setUserList] = useState([]);
 
-  
-  useEffect(()=>{
+  useEffect(() => {
     setUserID(pubnub.getUserId());
     if (selectedUserId) {
       const newChannel = [userId, selectedUserId].sort().join('_');
       setChannels(newChannel);
       pubnub.subscribe({ channels: [newChannel] });
-      fetchMessages(newChannel);
+      if (newChannel) {
+        fetchMessages(newChannel);
+      }
       return () => {
         if (channels) {
           pubnub.unsubscribe({ channels: [channels] });
         }
       };
     }
-  },[pubnub,selectedUserId,userId, channels])
-  
+  }, [pubnub, selectedUserId, userId, channels])
+
   useEffect(() => {
     pubnub.addListener({ message: handleMessage });
   }, [pubnub]);
@@ -35,7 +36,6 @@ const Chat = () => {
   const fetchUserList = async () => {
     try {
       const response = await axios.get('http://localhost:3001/users');
-      console.log("response=======", response.data);
       setUserList(response.data);
     } catch (error) {
       console.error('Error fetching user list', error);
@@ -44,9 +44,10 @@ const Chat = () => {
   useEffect(() => {
     fetchUserList();
   }, []);
-  
+
   const handleMessage = event => {
     const message = event.message;
+    // console.log("event", event.message);
     if (typeof message === 'string' || message.hasOwnProperty('text')) {
       const text = message.text || message;
       setMessages(messages => [...messages, text]);
@@ -65,33 +66,53 @@ const Chat = () => {
         .then(() => setMessage(''));
     }
   };
-  const handleUserClick = clickedUserId =>{
+  const handleUserClick = clickedUserId => {
     setSelectedUserId(clickedUserId);
   }
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (Channel) => {
     try {
       const history = await pubnub.history({
-        channel: channels,
+        channel: Channel,
         count: 100,
       });
-      const messagesFromHistory = history?.messages?.map((message) => message.entry);
+      const messagesFromHistory = history?.messages?.map((message) => {
+        const timetoken = message.timetoken;
+        const milliseconds = timetoken / 10000;
+        const date = new Date(milliseconds);
+        return {
+          ...message,
+          date: date.toLocaleString(),
+        };
+      });
+      // console.log("messagesFromHistory", messagesFromHistory);
       setMessages(messagesFromHistory || []);
-      console.log("history", history.messages);
     } catch (error) {
       console.error("Error fetching messages", error);
     }
   };
- 
+  const deleteMessage = async () => {
+    try {
+      const result = await pubnub.deleteMessages({
+        channel: channels,
+        start: "17047014092829076",
+        end: "17047246129351932",
+      });
+      console.log("deleted function succesfully hit");
+    } catch (status) {
+      console.log(status);
+    }
+  }
+
   return (
     <div className='conatiner'>
       <div className='userlist'>
         <p>{selectedUserId}</p>
         <p>current userid : {userId}</p>
-  
+
         <p>userlist</p>
         {userList.map((user) => (
-          <UserBox key={user.id} id={user._id} name={user.username} onClick={handleUserClick} />
+          <UserBox key={user._id} id={user._id} name={user.username} onClick={handleUserClick} />
         ))}
       </div>
       <div>
@@ -101,7 +122,8 @@ const Chat = () => {
             {messages.map((message, index) => {
               return (
                 <div key={`message-${index}`} className='messageStyles'>
-                  {message}
+                  {message.date && <>{message.date}<br /><br /></>}
+                  {message.text || message.entry}
                 </div>
               );
             })}
@@ -127,6 +149,7 @@ const Chat = () => {
             >
               Send Message
             </button>
+            <button onClick={deleteMessage}>deleteMessage</button>
           </div>
         </div>
       </div>
